@@ -1,2 +1,2 @@
-# arduino_sntp
+# arduino-ntpd
 A stand-alone Arduino GPS time server
