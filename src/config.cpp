@@ -1,0 +1,24 @@
+/*
+ * File: config.cpp
+ * Description:
+ *   Configuration for ArduinoNTPd.
+ * Author: Mooneer Salem <mooneer@gmail.com>
+ * License: New BSD License
+ */
+
+#include "config.h"
+
+#if defined(ARDUINO)
+
+// The desired IP address for your time server.
+// IPv4 only due to limitations of the Ethernet library.
+IPAddress ip_(192, 168, 1, 251);
+//IPAddress dns_(192,168, 1, 1);
+//IPAddress gateway_(192,168, 1, 1);
+//IPAddress subnet_(255, 255, 255, 0);
+
+// The desired MAC address for your time server.
+// This should not conflict with any other devices on your network!
+byte macAddress[] = { 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff };
+
+#endif // defined(ARDUINO)
