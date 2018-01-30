@@ -20,9 +20,6 @@
 // The desired IP address for your time server.
 // IPv4 only due to limitations of the Ethernet library.
 extern IPAddress ip_;
-//extern IPAddress dns_;
-//extern IPAddress gateway_;
-//extern IPAddress subnet_;
 
 // The desired MAC address for your time server.
 // This should not conflict with any other devices on your network!
@@ -45,10 +42,10 @@ extern byte macAddress[];
 
 // RX pin for the GPS receiver/shield. This should support change interrupts
 // per NewSoftSerial documentation.
-#define GPS_RX_PIN 19
+//#define GPS_RX_PIN 19
 
 // TX pin for the GPS receiver/shield.
-#define GPS_TX_PIN 18
+//#define GPS_TX_PIN 18
 
 // Or uncomment and modify this to use one of the built-in UARTs.
 // (possible choices: Serial1, Serial2, Serial3)

@@ -19,10 +19,9 @@
 /*
  * Contains the data in a typical NTP packet.
  */
-struct NtpPacket
-{
-    static const int PACKET_SIZE = 48;
-    
+static const int NTP_PACKET_SIZE = 48;
+
+struct NtpPacket {
     unsigned char leapVersionMode;
     
     unsigned int leapIndicator() const { return leapVersionMode >> 6; }
@@ -34,12 +33,13 @@ struct NtpPacket
     unsigned int mode() const { return (leapVersionMode & 0x07); }
     void mode(unsigned int newValue) { leapVersionMode = (leapVersionMode & 0xF8) | (newValue & 0x07); }
     
-    char stratum;
-    char poll;
-    char precision;
+    unsigned char stratum;
+    unsigned char poll;
+    unsigned char precision;
     uint32_t rootDelay;
     uint32_t rootDispersion;
     char referenceId[4];
+    
     uint32_t referenceTimestampSeconds;
     uint32_t referenceTimestampFraction;
     uint32_t originTimestampSeconds;
@@ -65,9 +65,8 @@ struct NtpPacket
     /*
      * Copies packet buffer to packet object.
      */
-    void populatePacket(char *buffer)
-    {
-        memcpy(this, buffer, PACKET_SIZE);
+    void populatePacket(char *buffer) {
+        memcpy(this, buffer, NTP_PACKET_SIZE);
     }
 private:
     /*

@@ -30,22 +30,18 @@ SerialDataSource dataSource;
 GPSTimeSource timeSource(dataSource);
 NtpServer timeServer(timeSource);
 
-void rootPage(HttpServer *server)
-{
+void rootPage(HttpServer *server) {
     server->responseRedirect("/time");
 }
 
-static void zeroPrepend(HttpServer *server, int val)
-{
-    if (val < 10)
-    {
+static void zeroPrepend(HttpServer *server, int val) {
+    if (val < 10) {
         server->print("0");
     }
     server->print(val);
 }
 
-void timePage(HttpServer *server)
-{
+void timePage(HttpServer *server) {
     server->responseOK();
     uint32_t secs, fract;
     timeSource.now(&secs, &fract);
@@ -70,8 +66,7 @@ void timePage(HttpServer *server)
     server->print(COMMON_PAGE_FOOTER);
 }
 
-void positionPage(HttpServer *server)
-{
+void positionPage(HttpServer *server) {
     server->responseOK();
     timeSource.now(NULL, NULL);
     float latitude = timeSource.latitude();
@@ -86,8 +81,7 @@ void positionPage(HttpServer *server)
     server->print(COMMON_PAGE_FOOTER);
 }
 
-void aboutPage(HttpServer *server)
-{
+void aboutPage(HttpServer *server) {
     server->responseOK();
     server->print(ABOUT_PAGE);
 }
@@ -101,8 +95,7 @@ UrlHandler handlers[] = {
 
 HttpServer httpServer(handlers, sizeof(handlers) / sizeof(UrlHandler));
 
-void setup()
-{
+void setup() {
     // Print banner.
     Serial.begin(115200);
     Serial.println("ArduinoNTPd starting.");
@@ -141,14 +134,12 @@ void setup()
     delay(1000);
 }
 
-void loop()
-{
+void loop() {
     bool processed = timeServer.processOneRequest();
     httpServer.processOneRequest();
 
 #ifdef ETH_RX_PIN
-    if (processed)
-    {
+    if (processed) {
         // Clear all interrupts.
         W5100.writeIR(0xE0);
         W5100.writeSnIR(3, 0xff);
@@ -160,3 +151,4 @@ void loop()
 }
 
 #endif // defined(ARDUINO)
+

@@ -55,12 +55,12 @@ public:
   /*
    * Interrupt handler for PPS input.
    */
-  static void PpsInterrupt();
+  void PpsInterrupt();
   
   /*
    * Interrupt handler for Ethernet input.
    */
-  static void RecvInterrupt();
+  void RecvInterrupt();
   
   /*
    * Retrieves current location.
@@ -77,10 +77,11 @@ public:
    * get ethernet receive time since epoch
    */
   virtual uint32_t timeRecv(uint32_t *secs, uint32_t *fract) const;
-    
-private:
-    static GPSTimeSource * singleton_;
 
+public:
+    static GPSTimeSource* singleton_;
+
+private:
     TinyGPS gps_;
     IDataSource &dataSource_;
 

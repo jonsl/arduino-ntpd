@@ -15,21 +15,15 @@
 #include "GPSTimeSource.h"
 #include "TimeUtilities.h"
 
-GPSTimeSource *GPSTimeSource::singleton_ = NULL;
+GPSTimeSource* GPSTimeSource::singleton_ = NULL;
 
-//volatile unsigned t4capval = 0;
-volatile unsigned t4ovfcnt_ = 0;
-//volatile unsigned long t4time = 0;
+volatile unsigned t4ovfcnt_;
+volatile unsigned t5ovfcnt_;
 
-//volatile unsigned t5capval = 0;
-volatile unsigned t5ovfcnt_ = 0;
-//volatile unsigned long t5time = 0;
+volatile uint32_t trecvsec_;
+volatile uint32_t trecvfract_;
 
-volatile uint32_t hello = 0;
-volatile uint32_t hello1 = 0;
-
-void GPSTimeSource::enableInterrupts()
-{
+void GPSTimeSource::enableInterrupts() {
 #ifdef ETH_RX_PIN
     // Enable Ethernet interrupt first to reduce difference between the two timers.
     // NOTE: NTP server must _always_ be initialized first to ensure that it occupies socket 0.
@@ -64,17 +58,15 @@ void GPSTimeSource::PpsInterrupt() {
 }
 
 void GPSTimeSource::RecvInterrupt() {
-  TCNT5 = 0;
-  t5ovfcnt_ = 0;
+  timePps(&trecvsec_, &trecvfract_);
 }
 
 ISR(TIMER4_OVF_vect) {
-    ++t4ovfcnt_;
+  ++t4ovfcnt_;
 }
 
 ISR(TIMER4_CAPT_vect) {
-    GPSTimeSource::PpsInterrupt();
-++hello;
+  GPSTimeSource::singleton_->GPSTimeSource::PpsInterrupt();
 }
 
 ISR(TIMER5_OVF_vect) {
@@ -82,8 +74,7 @@ ISR(TIMER5_OVF_vect) {
 }
 
 ISR(TIMER5_CAPT_vect) {
-    GPSTimeSource::RecvInterrupt();
-++hello1;
+    GPSTimeSource::singleton_->GPSTimeSource::RecvInterrupt();
 }
 
 void GPSTimeSource::timePps(uint32_t *secs, uint32_t *fract) const {
@@ -91,6 +82,11 @@ void GPSTimeSource::timePps(uint32_t *secs, uint32_t *fract) const {
   unsigned long t4diff = (t4now >> 1);
   if (secs) {
     *secs = t4diff / 1000000;
+    if (t4diff >= 1000000) {
+      Serial.print("!");
+      ++(*secs);
+      t4diff -= 1000000;
+    }
   }
   if (fract) {
     *fract = t4diff % 1000000;
@@ -98,14 +94,11 @@ void GPSTimeSource::timePps(uint32_t *secs, uint32_t *fract) const {
 }
 
 uint32_t GPSTimeSource::timeRecv(uint32_t *secs, uint32_t *fract) const {
-  unsigned long t5now = ((unsigned long)t5ovfcnt_ << 16) | TCNT5;
-  unsigned long t5diff = (t5now >> 1);// - t4time;
-
   if (secs) {
-    *secs = tgps_ + (t5diff / 1000000);
+    *secs = tgps_ + trecvsec_;
   }
   if (fract) {
-    *fract = (0xffffffff / 1000000) * (t5diff % 1000000);
+    *fract = (0xffffffff / 1000000) * trecvfract_;
   }
   return 0;
 }
@@ -123,8 +116,7 @@ void GPSTimeSource::now(uint32_t *secs, uint32_t *fract) {
         byte month, day, hour, minutes, second, hundredths;
         unsigned long fix_age;
     
-        gps_.crack_datetime(&year, &month, &day,
-          &hour, &minutes, &second, &hundredths, &fix_age);
+        gps_.crack_datetime(&year, &month, &day, &hour, &minutes, &second, &hundredths, &fix_age);
         gps_.f_get_position(&lat_, &long_);
     
         // We don't want to use the time we've received if 
@@ -158,8 +150,8 @@ void GPSTimeSource::now(uint32_t *secs, uint32_t *fract) {
     *fract = (0xffffffff / 1000000) * elapsed_fraction;
   }
 
-  Serial.print("secs is ");
-  Serial.println(*secs);
+//  Serial.print("secs is ");
+//  Serial.println(*secs);
 //  Serial.print("fract is ");
 //  Serial.println(*fract);
 }
