@@ -65,7 +65,7 @@ bool NtpServer::processOneRequest()
         packet.referenceId[2] = 'S';
         packet.referenceId[3] = 0;
 
-        timeSource_.now(&packet.referenceTimestampSeconds, &packet.referenceTimestampFraction);
+//        timeSource_.now(&packet.referenceTimestampSeconds, &packet.referenceTimestampFraction);
         packet.originTimestampSeconds = packet.transmitTimestampSeconds;
         packet.originTimestampFraction = packet.transmitTimestampFraction;
         packet.receiveTimestampSeconds = recvSecs;
