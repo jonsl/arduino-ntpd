@@ -23,6 +23,8 @@ volatile unsigned t5ovfcnt_;
 volatile uint32_t trecvsec_;
 volatile uint32_t trecvfract_;
 
+volatile bool isProcessingPps = false;
+
 void GPSTimeSource::enableInterrupts() {
 #ifdef ETH_RX_PIN
     // Enable Ethernet interrupt first to reduce difference between the two timers.
@@ -53,8 +55,11 @@ void GPSTimeSource::enableInterrupts() {
 }
 
 void GPSTimeSource::PpsInterrupt() {
-  TCNT4 = 0;
-  t4ovfcnt_ = 0;
+  if (!isProcessingPps) {
+    TCNT4 = 0;
+    t4ovfcnt_ = 0;
+    isProcessingPps = true;
+  }
 }
 
 void GPSTimeSource::RecvInterrupt() {
@@ -82,10 +87,8 @@ void GPSTimeSource::timePps(uint32_t *secs, uint32_t *fract) const {
   unsigned long t4diff = (t4now >> 1);
   if (secs) {
     *secs = t4diff / 1000000;
-    if (t4diff >= 1000000) {
-      Serial.print("!");
+    if (isProcessingPps) {
       ++(*secs);
-      t4diff -= 1000000;
     }
   }
   if (fract) {
@@ -107,7 +110,7 @@ void GPSTimeSource::now(uint32_t *secs, uint32_t *fract) {
   unsigned long elapsed_seconds, elapsed_fraction;
   timePps(&elapsed_seconds, &elapsed_fraction);
 
-  if (elapsed_seconds == 0) {
+  if (isProcessingPps) {
     while (dataSource_.available()) {
       int c = dataSource_.read();
       if (gps_.encode(c)) {
@@ -128,6 +131,8 @@ void GPSTimeSource::now(uint32_t *secs, uint32_t *fract) {
           tgps_ = 0;
           hasLocked_ = false;
         }
+
+        isProcessingPps = false;
 
         // recalculate utc now
         timePps(&elapsed_seconds, &elapsed_fraction);
