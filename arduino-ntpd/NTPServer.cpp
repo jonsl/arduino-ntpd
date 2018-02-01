@@ -53,16 +53,16 @@ bool NtpServer::processOneRequest()
         packet.versionNumber(3);
         packet.mode(4);
         packet.stratum = 1;
-        packet.poll = 0;//10; // 6-10 per RFC 5905.
-        packet.precision = 0;//-21; // ~0.5 microsecond precision.
-        packet.rootDelay = 0; //60 * (0xFFFF / 1000); // ~60 milliseconds, TBD
-        packet.rootDispersion = 0; //10 * (0xFFFF / 1000); // ~10 millisecond dispersion, TBD
-        packet.referenceId[0] = 0;//'G';
-        packet.referenceId[1] = 0;//'P';
-        packet.referenceId[2] = 0;//'S';
+        packet.poll = 6;//10; // 6-10 per RFC 5905.
+        packet.precision = -21; // ~0.5 microsecond precision.
+        packet.rootDelay = 60 * (0xFFFF / 1000); // ~60 milliseconds, TBD
+        packet.rootDispersion = 1 * (0xFFFF / 1000); // ~10 millisecond dispersion, TBD
+        packet.referenceId[0] = 'G';
+        packet.referenceId[1] = 'P';
+        packet.referenceId[2] = 'S';
         packet.referenceId[3] = 0;
 
-        timeSource_.now(&packet.referenceTimestampSeconds, &packet.referenceTimestampFraction);
+//        timeSource_.now(&packet.referenceTimestampSeconds, &packet.referenceTimestampFraction);
         // REF: http://support.ntp.org/bin/view/Support/DraftRfc2030
         // '.. the client sets the Transmit Timestamp field in the request
         // to the time of day according to the client clock in NTP timestamp format.'
@@ -78,28 +78,36 @@ bool NtpServer::processOneRequest()
         packet.receiveTimestampFraction = recvFract;
         
         // ...and the transmit time.
-        timeSource_.now(&packet.transmitTimestampSeconds, &packet.transmitTimestampFraction);
+        timeSource_.now(&packet.referenceTimestampSeconds, &packet.referenceTimestampFraction);
+        packet.transmitTimestampSeconds = packet.referenceTimestampSeconds;
+        packet.transmitTimestampFraction = packet.referenceTimestampFraction;
+//        timeSource_.now(&packet.transmitTimestampSeconds, &packet.transmitTimestampFraction);
 
-        Serial.println("--------------");
-        Serial.print("rf=");
-        Serial.print(packet.referenceTimestampSeconds);
+        Serial.print("do=");
+        Serial.print(packet.receiveTimestampSeconds - packet.originTimestampSeconds );
         Serial.print(":");
-        Serial.println(packet.referenceTimestampFraction);
-        
-        Serial.print("or=");
-        Serial.print(packet.originTimestampSeconds);
-        Serial.print(":");
-        Serial.println(packet.originTimestampFraction);
-        
-        Serial.print("rx=");
-        Serial.print(packet.receiveTimestampSeconds);
-        Serial.print(":");
-        Serial.println(packet.receiveTimestampFraction);
-        
-        Serial.print("tx=");
-        Serial.print(packet.transmitTimestampSeconds);
-        Serial.print(":");
-        Serial.println(packet.transmitTimestampFraction);
+        Serial.println(packet.receiveTimestampSeconds - packet.originTimestampFraction);
+
+//        Serial.println("--------------");
+//        Serial.print("rf=");
+//        Serial.print(packet.referenceTimestampSeconds);
+//        Serial.print(":");
+//        Serial.println(packet.referenceTimestampFraction);
+//        
+//        Serial.print("or=");
+//        Serial.print(packet.originTimestampSeconds);
+//        Serial.print(":");
+//        Serial.println(packet.originTimestampFraction);
+//        
+//        Serial.print("rx=");
+//        Serial.print(packet.receiveTimestampSeconds);
+//        Serial.print(":");
+//        Serial.println(packet.receiveTimestampFraction);
+//        
+//        Serial.print("tx=");
+//        Serial.print(packet.transmitTimestampSeconds);
+//        Serial.print(":");
+//        Serial.println(packet.transmitTimestampFraction);
 
         // Now transmit the response to the client.
         packet.swapEndian();

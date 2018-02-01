@@ -85,7 +85,7 @@ bool HttpServer::processOneRequest()
     return processed;
 }
 
-void HttpServer::responseRedirect(char *url)
+void HttpServer::responseRedirect(char const* url)
 {
     currentClient_.println("HTTP/1.0 302 Found");
     currentClient_.print("Location: ");

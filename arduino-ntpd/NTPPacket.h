@@ -34,10 +34,10 @@ struct NtpPacket {
     void mode(unsigned int newValue) { leapVersionMode = (leapVersionMode & 0xF8) | (newValue & 0x07); }
     
     unsigned char stratum;
-    unsigned char poll;
-    unsigned char precision;
-    uint32_t rootDelay;
-    uint32_t rootDispersion;
+    char poll;
+    char precision;
+    int32_t rootDelay;
+    int32_t rootDispersion;
     char referenceId[4];
     
     uint32_t referenceTimestampSeconds;

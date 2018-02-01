@@ -1,4 +1,3 @@
-
 /*
  * File: GPSTimeSource.h
  * Description:
@@ -18,7 +17,6 @@
 #define noInterrupts()
 #endif // defined(ARDUINO)
 
-//#include <TinyGPS++.h>
 #include <TinyGPS.h>
 #include "config.h"
 #include "ITimeSource.h"
@@ -31,66 +29,74 @@
 class GPSTimeSource : public ITimeSource
 {
 public:
-  GPSTimeSource(IDataSource &dataSource)
-      : dataSource_(dataSource),
-        tgps_(0),
-        hasLocked_(false) {
-      // empty
-  }
-  
-  virtual ~GPSTimeSource() {
-      // empty
-  }
-  
-  /* 
-   * Grabs latest time from the time source.
-   */
-  virtual void now(uint32_t *secs, uint32_t *fract);
-  
-  /*
-   * Enables interrupts.
-   */
-  void enableInterrupts();
-  
-  /*
-   * Interrupt handler for PPS input.
-   */
-  void PpsInterrupt();
-  
-  /*
-   * Interrupt handler for Ethernet input.
-   */
-  void RecvInterrupt();
-  
-  /*
-   * Retrieves current location.
-   */
-  float latitude() const { return lat_; }
-  float longitude() const { return long_; }
-  
-  /*
-   * get time now since epoch
-   */
-  void timePps(uint32_t *secs, uint32_t *fract) const;
-  
-  /*
-   * get ethernet receive time since epoch
-   */
-  virtual uint32_t timeRecv(uint32_t *secs, uint32_t *fract) const;
+    GPSTimeSource(IDataSource &dataSource)
+        : dataSource_(dataSource),
+          secondsSinceEpoch_(0),
+          fractionalSecondsSinceEpoch_(0),
+          microsecondsPerSecond_(0),
+          hasLocked_(false)
+    {
+        // empty
+    }
+    
+    virtual ~GPSTimeSource()
+    {
+        // empty
+    }
+    
+    /* 
+     * Grabs latest time from the time source.
+     */
+    virtual void now(uint32_t *secs, uint32_t *fract);
 
-public:
-    static GPSTimeSource* singleton_;
-
+    /*
+     * Enables interrupts.
+     */
+    void enableInterrupts();
+    
+    /*
+     * Interrupt handler for PPS input.
+     */
+    static void PpsInterrupt();
+    
+    /*
+     * Interrupt handler for Ethernet input.
+     */
+    static void RecvInterrupt();
+    
+    /*
+     * Retrieves current location.
+     */
+    float latitude() const { return lat_; }
+    float longitude() const { return long_; }
+    
+    /*
+     * Ethernet receive time.
+     */
+    virtual uint32_t timeRecv(uint32_t *secs, uint32_t *fract) const
+    {
+        *secs = secondsOfRecv_;
+        *fract = fractionalSecondsOfRecv_;
+    }
+    
 private:
+    static GPSTimeSource *Singleton_;
+    
     TinyGPS gps_;
     IDataSource &dataSource_;
-
-    uint32_t tgps_;
-
+    uint32_t secondsSinceEpoch_;
+    uint32_t fractionalSecondsSinceEpoch_;
+    uint32_t millisecondsOfLastUpdate_;
+    uint32_t microsecondsPerSecond_;
+    uint32_t secondsOfRecv_;
+    uint32_t fractionalSecondsOfRecv_;
+    
     float lat_;
     float long_;
-
+    
     bool hasLocked_;
+
+    void updateFractionalSeconds_();
 };
 
 #endif // GPS_TIMESOURCE_H

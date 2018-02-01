@@ -5,7 +5,7 @@
  * Author: Mooneer Salem <mooneer@gmail.com>
  * License: New BSD License
  */
-#include <time.h>
+
 #include "config.h"
 
 #ifdef ETH_RX_PIN
@@ -15,24 +15,19 @@
 #include "GPSTimeSource.h"
 #include "TimeUtilities.h"
 
-GPSTimeSource* GPSTimeSource::singleton_ = NULL;
+GPSTimeSource *GPSTimeSource::Singleton_ = NULL;
+volatile uint32_t overflows = 0;
+volatile uint32_t overflowsRecv = 0;
 
-volatile unsigned t4ovfcnt_;
-volatile unsigned t5ovfcnt_;
-
-volatile uint32_t trecvsec_;
-volatile uint32_t trecvfract_;
-
-volatile bool isProcessingPps = false;
-
-void GPSTimeSource::enableInterrupts() {
+void GPSTimeSource::enableInterrupts()
+{
 #ifdef ETH_RX_PIN
     // Enable Ethernet interrupt first to reduce difference between the two timers.
     // NOTE: NTP server must _always_ be initialized first to ensure that it occupies socket 0.
     W5100.writeIMR(0x01);
 #endif
 
-    singleton_ = this;
+    Singleton_ = this;
     pinMode(PPS_PIN, INPUT);
     
     TCCR4A = 0 ;                    // Normal counting mode
@@ -54,110 +49,113 @@ void GPSTimeSource::enableInterrupts() {
     Serial.println("interrupts enabled");
 }
 
-void GPSTimeSource::PpsInterrupt() {
-  if (!isProcessingPps) {
-    TCNT4 = 0;
-    t4ovfcnt_ = 0;
-    isProcessingPps = true;
-  }
+void GPSTimeSource::PpsInterrupt()
+{
+    // Get saved time value.
+    uint32_t tmrVal = (overflows << 16) | ICR4;
+    
+    GPSTimeSource::Singleton_->microsecondsPerSecond_ = 
+        (GPSTimeSource::Singleton_->microsecondsPerSecond_ + 
+        (tmrVal - Singleton_->millisecondsOfLastUpdate_)) / 2;
+    GPSTimeSource::Singleton_->secondsSinceEpoch_++;
+    GPSTimeSource::Singleton_->fractionalSecondsSinceEpoch_ = 0;
+    GPSTimeSource::Singleton_->millisecondsOfLastUpdate_ = tmrVal;
 }
 
-void GPSTimeSource::RecvInterrupt() {
-  timePps(&trecvsec_, &trecvfract_);
-}
+void GPSTimeSource::RecvInterrupt()
+{
+    // Get saved time value.
+    uint32_t tmrVal = (overflowsRecv << 16) | ICR5;
+    uint32_t tmrDiff = tmrVal - GPSTimeSource::Singleton_->millisecondsOfLastUpdate_;
 
-ISR(TIMER4_OVF_vect) {
-  ++t4ovfcnt_;
-}
-
-ISR(TIMER4_CAPT_vect) {
-  GPSTimeSource::singleton_->GPSTimeSource::PpsInterrupt();
-}
-
-ISR(TIMER5_OVF_vect) {
-    ++t5ovfcnt_;
-}
-
-ISR(TIMER5_CAPT_vect) {
-    GPSTimeSource::singleton_->GPSTimeSource::RecvInterrupt();
-}
-
-void GPSTimeSource::timePps(uint32_t *secs, uint32_t *fract) const {
-  unsigned long t4now = ((unsigned long)t4ovfcnt_ << 16) | TCNT4;
-  unsigned long t4diff = (t4now >> 1);
-  if (secs) {
-    *secs = t4diff / 1000000;
-    if (isProcessingPps) {
-      ++(*secs);
+    GPSTimeSource::Singleton_->fractionalSecondsOfRecv_ =
+        (tmrDiff % GPSTimeSource::Singleton_->microsecondsPerSecond_) * 
+        (0xFFFFFFFF / GPSTimeSource::Singleton_->microsecondsPerSecond_);
+   
+    GPSTimeSource::Singleton_->secondsOfRecv_ = GPSTimeSource::Singleton_->secondsSinceEpoch_;     
+    if (tmrDiff > GPSTimeSource::Singleton_->microsecondsPerSecond_)
+    {
+        ++GPSTimeSource::Singleton_->secondsOfRecv_;
     }
-  }
-  if (fract) {
-    *fract = t4diff % 1000000;
-  }
 }
 
-uint32_t GPSTimeSource::timeRecv(uint32_t *secs, uint32_t *fract) const {
-  if (secs) {
-    *secs = tgps_ + trecvsec_;
-  }
-  if (fract) {
-    *fract = (0xffffffff / 1000000) * trecvfract_;
-  }
-  return 0;
+ISR(TIMER4_OVF_vect)
+{
+    ++overflows;
 }
 
-void GPSTimeSource::now(uint32_t *secs, uint32_t *fract) {
-  unsigned long elapsed_seconds, elapsed_fraction;
-  timePps(&elapsed_seconds, &elapsed_fraction);
+ISR(TIMER4_CAPT_vect)
+{
+    GPSTimeSource::PpsInterrupt();
+}
 
-  if (isProcessingPps) {
-    while (dataSource_.available()) {
-      int c = dataSource_.read();
-      if (gps_.encode(c)) {
-        // Grab time from now-valid data.
-        int year;
-        byte month, day, hour, minutes, second, hundredths;
-        unsigned long fix_age;
-    
-        gps_.crack_datetime(&year, &month, &day, &hour, &minutes, &second, &hundredths, &fix_age);
-        gps_.f_get_position(&lat_, &long_);
-    
-        // We don't want to use the time we've received if 
-        // the fix is invalid.
-        if (fix_age != TinyGPS::GPS_INVALID_AGE && fix_age < 5000 && year >= 2013) {
-          tgps_ = TimeUtilities::numberOfSecondsSince1900Epoch(year, month, day, hour, minutes, second);
-          hasLocked_ = true;
-        } else {
-          tgps_ = 0;
-          hasLocked_ = false;
+ISR(TIMER5_OVF_vect)
+{
+    ++overflowsRecv;
+}
+
+ISR(TIMER5_CAPT_vect)
+{
+    GPSTimeSource::RecvInterrupt();
+}
+
+void GPSTimeSource::updateFractionalSeconds_(void)
+{
+    // Calculate new fractional value based on system runtime
+    // since the EM-406 does not seem to return anything other than whole seconds.
+    uint32_t lastTime = (overflows << 16) | TCNT4;
+    uint32_t millisecondDifference = lastTime - millisecondsOfLastUpdate_;
+    fractionalSecondsSinceEpoch_ = (millisecondDifference % microsecondsPerSecond_) * (0xFFFFFFFF / microsecondsPerSecond_);
+}
+
+void GPSTimeSource::now(uint32_t *secs, uint32_t *fract)
+{
+    while (dataSource_.available())
+    {
+        int c = dataSource_.read();
+        if (gps_.encode(c))
+        {
+            // Grab time from now-valid data.
+            int year;
+            byte month, day, hour, minutes, second, hundredths;
+            unsigned long fix_age;
+
+            gps_.crack_datetime(&year, &month, &day,
+              &hour, &minutes, &second, &hundredths, &fix_age);
+            gps_.f_get_position(&lat_, &long_);
+            
+            // We don't want to use the time we've received if 
+            // the fix is invalid.
+            if (fix_age != TinyGPS::GPS_INVALID_AGE && fix_age < 5000 && year >= 2013)
+            {
+                uint32_t tempSeconds = 
+                    TimeUtilities::numberOfSecondsSince1900Epoch(
+                        year, month, day, hour, minutes, second);
+                
+                if (tempSeconds != secondsSinceEpoch_)
+                {
+                    secondsSinceEpoch_ = tempSeconds;
+                    hasLocked_ = true;
+                }
+            }
+            else
+            {
+                // Set time to 0 if invalid.
+                // TODO: does the interface need an accessor for "invalid time"?
+                secondsSinceEpoch_ = 0;
+                fractionalSecondsSinceEpoch_ = 0;
+            }
         }
-
-        isProcessingPps = false;
-
-        // recalculate utc now
-        timePps(&elapsed_seconds, &elapsed_fraction);
-
-//        Serial.print("tgps_ is ");
-//        Serial.println(tgps_);
-      }
     }
-  }
-
-//  Serial.print("elapsed_seconds is ");
-//  Serial.println(elapsed_seconds);
-//  Serial.print("elapsed_fraction is ");
-//  Serial.println(elapsed_fraction);
-
-  if (secs) {
-    *secs = tgps_ + elapsed_seconds;
-  }
-  if (fract) {
-    *fract = (0xffffffff / 1000000) * elapsed_fraction;
-  }
-
-//  Serial.print("secs is ");
-//  Serial.println(*secs);
-//  Serial.print("fract is ");
-//  Serial.println(*fract);
+    
+    updateFractionalSeconds_();
+    
+    if (secs)
+    {
+        *secs = secondsSinceEpoch_;
+    }
+    if (fract)
+    {
+        *fract = fractionalSecondsSinceEpoch_;
+    }
 }
-

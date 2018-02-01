@@ -50,7 +50,7 @@ public:
     /*
      * Redirects the user to a new URL.
      */
-    void responseRedirect(char *url);
+    void responseRedirect(char const* url);
     
     /*
      * Send OK response to client.
